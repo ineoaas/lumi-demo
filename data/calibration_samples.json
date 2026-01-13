@@ -1,0 +1,14 @@
+[
+  {"text": "My dog died", "label": "Sad/Depressed"},
+  {"text": "I got a promotion", "label": "Joy/Happy"},
+  {"text": "I'm anxious about exams", "label": "Fearful/Anxious"},
+  {"text": "This is disgusting", "label": "Disgusted/Envious"},
+  {"text": "Wow, that's amazing!", "label": "Joy/Happy"},
+  {"text": "I'm looking forward to tomorrow", "label": "Anticipation/Optimistic"},
+  {"text": "I feel calm and relaxed", "label": "Calm/Relaxed"},
+  {"text": "I'm furious about this", "label": "Angry/Irritated"},
+  {"text": "Surprising news!", "label": "Surprised/Inspired"},
+  {"text": "I can't stop thinking about it and I'm nervous", "label": "Fearful/Anxious"},
+  {"text": "I don't care at all", "label": "Neutral/Mixed"},
+  {"text": "I'm in love with the results!", "label": "Joy/Happy"}
+]

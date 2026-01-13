@@ -1,0 +1,8 @@
+{"text": "My dog died", "label": "Sad/Depressed"}
+{"text": "I just got promoted!", "label": "Joy/Happy"}
+{"text": "I'm nervous about the exam tomorrow", "label": "Fearful/Anxious"}
+
+# Instructions:
+# - Save as JSONL (one JSON object per line).
+# - Use the label names exactly as in `EMOTION_MAP` keys (e.g., "Sad/Depressed").
+# - Collect at least 200 examples covering all categories, ideally 300-500 for robust fine-tuning.

@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Data and models
+ai_models/
+models/
+
+# OS
+.DS_Store
+
+# Editor
+.vscode/

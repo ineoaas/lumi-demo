@@ -111,6 +111,221 @@ export EMOTION_MODEL=models/emotion-finetuned
 ```
 - For production, serve over HTTPS and restrict CORS to trusted domains.
 
+Flutter integration (complete step-by-step guide)
+
+### New Feature: One-Sentence Day Summary
+
+After the user submits their input, the API now returns a `summary` field with a human-readable, second-person recap of their day in a single sentence. For example:
+
+**Input:**
+- Morning: Woke up early and had coffee
+- A key moment: Got promoted at work
+- Interaction: Caught up with an old friend
+- A challenge: Had an argument with my sibling
+- Evening: Relaxed with a good book
+
+**Response includes:**
+```json
+{
+  "emotion": "Calm",
+  "hue": 120,
+  "confidence": "31.2%",
+  "summary": "You woke up early and had coffee, got promoted at work, caught up with an old friend."
+}
+```
+
+### Step-by-Step Flutter Setup
+
+1. **Ensure your backend is running and accessible:**
+   - If running locally: `http://127.0.0.1:8000`
+   - If on a remote server or emulator: Replace with your server IP address (e.g., `http://192.168.x.x:8000` for a LAN device)
+
+2. **Add the `http` package to your `pubspec.yaml`:**
+   ```yaml
+   dependencies:
+     flutter:
+       sdk: flutter
+     http: ^0.13.6
+   ```
+
+3. **Create a service class in your Flutter app:**
+
+   ```dart
+   import 'dart:convert';
+   import 'package:http/http.dart' as http;
+   
+   class LumiService {
+     final String baseUrl = 'http://YOUR_SERVER:8000';  // Replace with your backend URL
+   
+     // Predict from a single text string
+     Future<Map<String, dynamic>> predictText(String text) async {
+       final response = await http.post(
+         Uri.parse('$baseUrl/predict_text'),
+         headers: {'Content-Type': 'application/json'},
+         body: jsonEncode({'text': text}),
+       );
+   
+       if (response.statusCode == 200) {
+         return jsonDecode(response.body) as Map<String, dynamic>;
+       } else {
+         throw Exception('Failed to predict: ${response.statusCode}');
+       }
+     }
+   
+     // Predict from multiple lines (like the demo)
+     Future<Map<String, dynamic>> predictLines(List<String> lines) async {
+       final response = await http.post(
+         Uri.parse('$baseUrl/predict'),
+         headers: {'Content-Type': 'application/json'},
+         body: jsonEncode({'lines': lines}),
+       );
+   
+       if (response.statusCode == 200) {
+         return jsonDecode(response.body) as Map<String, dynamic>;
+       } else {
+         throw Exception('Failed to predict: ${response.statusCode}');
+       }
+     }
+   
+     // Helper: Convert HSL hue (0-360) to Flutter Color
+     Color hueToColor(int? hue) {
+       if (hue == null) return Colors.grey;
+       // Convert hue to HSL Color
+       return HSLColor.fromAHSL(1.0, hue.toDouble(), 0.85, 0.65).toColor();
+     }
+   }
+   ```
+
+4. **Use the service in your Flutter widget:**
+
+   ```dart
+   import 'package:flutter/material.dart';
+   
+   class LumiDemoScreen extends StatefulWidget {
+     @override
+     State<LumiDemoScreen> createState() => _LumiDemoScreenState();
+   }
+   
+   class _LumiDemoScreenState extends State<LumiDemoScreen> {
+     final lumiService = LumiService();
+     final controllers = List.generate(5, (_) => TextEditingController());
+     Map<String, dynamic>? prediction;
+     bool isLoading = false;
+   
+     @override
+     void dispose() {
+       for (var c in controllers) c.dispose();
+       super.dispose();
+     }
+   
+     void _analyzeDay() async {
+       setState(() => isLoading = true);
+       try {
+         final lines = controllers.map((c) => c.text).toList();
+         final result = await lumiService.predictLines(lines);
+         setState(() {
+           prediction = result;
+           isLoading = false;
+         });
+       } catch (e) {
+         ScaffoldMessenger.of(context).showSnackBar(
+           SnackBar(content: Text('Error: $e')),
+         );
+         setState(() => isLoading = false);
+       }
+     }
+   
+     @override
+     Widget build(BuildContext context) {
+       return Scaffold(
+         appBar: AppBar(title: Text('Lumi — Your Day in Color')),
+         body: SingleChildScrollView(
+           padding: EdgeInsets.all(16),
+           child: Column(
+             children: [
+               ...List.generate(
+                 5,
+                 (i) => Padding(
+                   padding: EdgeInsets.only(bottom: 12),
+                   child: TextField(
+                     controller: controllers[i],
+                     decoration: InputDecoration(
+                       hintText: [
+                         'Morning...',
+                         'A key moment...',
+                         'Interaction...',
+                         'A challenge...',
+                         'Evening thought...',
+                       ][i],
+                       border: OutlineInputBorder(),
+                     ),
+                   ),
+                 ),
+               ),
+               SizedBox(height: 16),
+               ElevatedButton(
+                 onPressed: isLoading ? null : _analyzeDay,
+                 child: Text(isLoading ? 'Processing...' : 'Reveal My Color'),
+               ),
+               if (prediction != null) ...[
+                 SizedBox(height: 24),
+                 Container(
+                   width: 120,
+                   height: 120,
+                   decoration: BoxDecoration(
+                     color: lumiService.hueToColor(prediction!['hue'] as int?),
+                     shape: BoxShape.circle,
+                     boxShadow: [
+                       BoxShadow(
+                         color: lumiService.hueToColor(prediction!['hue'] as int?).withOpacity(0.3),
+                         blurRadius: 20,
+                         spreadRadius: 5,
+                       ),
+                     ],
+                   ),
+                 ),
+                 SizedBox(height: 16),
+                 Text(
+                   prediction!['emotion'] as String? ?? 'Neutral',
+                   style: Theme.of(context).textTheme.headlineSmall,
+                 ),
+                 Text(
+                   'Confidence: ${prediction!['confidence']}',
+                   style: Theme.of(context).textTheme.bodySmall,
+                 ),
+                 SizedBox(height: 12),
+                 // Display the summary sentence
+                 Container(
+                   padding: EdgeInsets.all(12),
+                   decoration: BoxDecoration(
+                     color: Colors.grey[100],
+                     borderRadius: BorderRadius.circular(8),
+                   ),
+                   child: Text(
+                     prediction!['summary'] as String? ?? 'No summary available',
+                     style: Theme.of(context).textTheme.bodyMedium,
+                     textAlign: TextAlign.center,
+                   ),
+                 ),
+               ],
+             ],
+           ),
+         ),
+       );
+     }
+   }
+   ```
+
+5. **Testing with your device:**
+   - **Local testing (emulator):** Use `http://10.0.2.2:8000` to access your host machine's localhost from an Android emulator.
+   - **Physical device on LAN:** Use your machine's LAN IP (e.g., `http://192.168.1.100:8000`).
+   - **Remote server:** Use your server's URL.
+
+6. **Production deployment:**
+   - Serve the backend over HTTPS.
+   - Update your Flutter app to use the HTTPS URL.
+   - Implement error handling and retry logic for network failures.
+
 Flutter integration (basic example)
 
 - Ensure the backend is reachable from the mobile app (use your server URL and enable CORS or provide a proxy).

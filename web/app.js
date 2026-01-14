@@ -20,6 +20,15 @@ async function analyzeDay() {
     document.getElementById('emotionText').innerText = data.emotion;
     document.getElementById('confText').innerText = `Confidence: ${data.confidence}`;
     document.getElementById('methodText').innerText = `Method: ${data.method}`;
+    // Show summary if present
+    let summaryDiv = document.getElementById('summaryText');
+    if (!summaryDiv) {
+      summaryDiv = document.createElement('div');
+      summaryDiv.id = 'summaryText';
+      summaryDiv.className = 'meta';
+      document.getElementById('result').appendChild(summaryDiv);
+    }
+    summaryDiv.innerText = data.summary || '';
 
     const color = data.hue !== null ? `hsl(${data.hue},85%,65%)` : '#e9edf2';
     orb.style.background = color;

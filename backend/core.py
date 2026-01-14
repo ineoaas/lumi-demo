@@ -1,9 +1,11 @@
 import os
 from typing import List
+from transformers import pipeline
+import torch
 
-# Pipeline placeholders (lazy init)
 zero_shot = None
 emotion_classifier = None
+summarizer_pipeline = None
 EMOTION_MODEL = os.environ.get("EMOTION_MODEL", "j-hartmann/emotion-english-distilroberta-base")
 
 # Thresholds
@@ -38,8 +40,8 @@ EMOTION_MODEL_MAP = {
 
 
 def load_pipelines():
-    global zero_shot, emotion_classifier
-    if zero_shot is not None and emotion_classifier is not None:
+    global zero_shot, emotion_classifier, summarizer_pipeline
+    if zero_shot is not None and emotion_classifier is not None and summarizer_pipeline is not None:
         return
     try:
         from transformers import pipeline as hf_pipeline
@@ -47,6 +49,14 @@ def load_pipelines():
             zero_shot = hf_pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
         if emotion_classifier is None:
             emotion_classifier = hf_pipeline("text-classification", model=EMOTION_MODEL)
+        if summarizer_pipeline is None:
+            print("Loading summarization model...")
+            # Use a reliable, GPU-friendly summarization model
+            summarizer_pipeline = hf_pipeline(
+                "summarization",
+                model="facebook/bart-large-cnn"
+            )
+            print("Summarization model loaded!")
     except Exception as e:
         print("Warning: could not initialize transformers pipelines:", e)
 
@@ -57,7 +67,54 @@ def analyze_text(text_to_analyze: str) -> dict:
     """
     text = text_to_analyze.strip()
     if not text:
-        return {"emotion": "Neutral", "hue": None, "confidence": "0%", "method": "none", "candidates": [], "version": {"emotion_model": EMOTION_MODEL, "zero_shot": "facebook/bart-large-mnli"}}
+        return {"emotion": "Neutral", "hue": None, "confidence": "0%", "method": "none", "candidates": [], "version": {"emotion_model": EMOTION_MODEL, "zero_shot": "facebook/bart-large-mnli"}, "summary": "No text provided, so emotion is Neutral."}
+
+    def make_summary(user_text):
+        load_pipelines()
+        import re
+        lines = [l.strip() for l in re.split(r'[\n\r]+', user_text) if l.strip()]
+        if not lines:
+            return "You had a quiet day."
+        
+        # Extract main verbs/actions from each line and combine them
+        # This creates a condensed summary like "You did X, then Y, then Z"
+        actions = []
+        for line in lines:
+            # Remove common label prefixes
+            line_clean = re.sub(r'^(Morning|Afternoon|Evening|Night|Day|Morning:|Afternoon:|Evening:|Night:|A key moment|Interaction|A challenge|Event|Thing|Activity|Note)[\s:]*', '', line, flags=re.IGNORECASE)
+            if line_clean:
+                # Convert to second person if needed
+                line_clean = re.sub(r'\bI\b', 'you', line_clean, flags=re.IGNORECASE)
+                line_clean = re.sub(r'\bmy\b', 'your', line_clean, flags=re.IGNORECASE)
+                line_clean = re.sub(r'\bme\b', 'you', line_clean, flags=re.IGNORECASE)
+                line_clean = line_clean.strip()
+                # Lowercase first letter
+                if line_clean:
+                    line_clean = line_clean[0].lower() + line_clean[1:]
+                    actions.append(line_clean)
+        
+        if not actions:
+            return "You had a quiet day."
+        
+        # Create a natural summary by joining actions with commas
+        if len(actions) == 1:
+            action = actions[0]
+            # Avoid "You you..." by checking if it already starts with "you"
+            if action.lower().startswith('you '):
+                summary = action[0].upper() + action[1:]  # Capitalize first letter
+            else:
+                summary = f"You {action}"
+        elif len(actions) <= 3:
+            summary = "You " + ", ".join(actions)
+        else:
+            # For 4+ actions, combine them more concisely
+            summary = "You " + ", ".join(actions[:3]) + "."
+        
+        # Ensure ends with period
+        if not summary.endswith('.'):
+            summary += '.'
+        
+        return summary
 
     candidate_labels = list(EMOTION_MAP.keys())
 
@@ -90,7 +147,9 @@ def analyze_text(text_to_analyze: str) -> dict:
             for k, v in sorted(mapped_scores.items(), key=lambda kv: kv[1], reverse=True):
                 c_hue = EMOTION_MAP.get(k, {}).get("hue")
                 candidates.append({"source": "emotion-model", "label": k, "hue": c_hue, "score": v})
-            return {"emotion": color_data["label"], "hue": color_data["hue"], "confidence": f"{mapped_score:.1%}", "raw_emotion": mapped_key, "method": "emotion-model-multi", "candidates": candidates, "version": {"emotion_model": EMOTION_MODEL, "zero_shot": "facebook/bart-large-mnli"}}
+            result = {"emotion": color_data["label"], "hue": color_data["hue"], "confidence": f"{mapped_score:.1%}", "raw_emotion": mapped_key, "method": "emotion-model-multi", "candidates": candidates, "version": {"emotion_model": EMOTION_MODEL, "zero_shot": "facebook/bart-large-mnli"}}
+            result["summary"] = make_summary(text)
+            return result
 
     if label_scores:
         top_emotion_pred = max(label_scores.items(), key=lambda kv: kv[1])
@@ -105,7 +164,9 @@ def analyze_text(text_to_analyze: str) -> dict:
                 mapped = EMOTION_MODEL_MAP.get(lab, "Neutral/Mixed")
                 hue = EMOTION_MAP.get(mapped, {}).get("hue")
                 candidates.append({"source": "emotion-model", "label": mapped, "hue": hue, "score": sc})
-            return {"emotion": color_data["label"], "hue": color_data["hue"], "confidence": f"{model_score:.1%}", "raw_emotion": mapped_key, "method": "emotion-model", "candidates": candidates, "version": {"emotion_model": EMOTION_MODEL, "zero_shot": "facebook/bart-large-mnli"}}
+            result = {"emotion": color_data["label"], "hue": color_data["hue"], "confidence": f"{model_score:.1%}", "raw_emotion": mapped_key, "method": "emotion-model", "candidates": candidates, "version": {"emotion_model": EMOTION_MODEL, "zero_shot": "facebook/bart-large-mnli"}}
+            result["summary"] = make_summary(text)
+            return result
 
     # Fallback to zero-shot
     load_pipelines()
@@ -131,7 +192,9 @@ def analyze_text(text_to_analyze: str) -> dict:
         for lbl, sc in zip(output.get("labels", [])[:3], output.get("scores", [])[:3]):
             hue = EMOTION_MAP.get(lbl, {}).get("hue")
             zs_candidates.append({"source": "zero-shot", "label": lbl, "hue": hue, "score": float(sc)})
-        return {"emotion": color_data["label"], "hue": color_data["hue"], "confidence": f"{max(top_score, model_score):.1%}", "raw_emotion": top_emotion, "method": "fallback-neutral", "candidates": zs_candidates, "version": {"emotion_model": EMOTION_MODEL, "zero_shot": "facebook/bart-large-mnli"}}
+        result = {"emotion": color_data["label"], "hue": color_data["hue"], "confidence": f"{max(top_score, model_score):.1%}", "raw_emotion": top_emotion, "method": "fallback-neutral", "candidates": zs_candidates, "version": {"emotion_model": EMOTION_MODEL, "zero_shot": "facebook/bart-large-mnli"}}
+        result["summary"] = make_summary(text)
+        return result
 
     if model_score > top_score and model_label:
         mapped_key = EMOTION_MODEL_MAP.get(model_label, "Neutral/Mixed")
@@ -155,7 +218,9 @@ def analyze_text(text_to_analyze: str) -> dict:
         hue = EMOTION_MAP.get(lbl, {}).get("hue")
         candidates.append({"source": "zero-shot", "label": lbl, "hue": hue, "score": float(sc)})
 
-    return {"emotion": color_data["label"], "hue": color_data["hue"], "confidence": f"{chosen_score:.1%}", "raw_emotion": raw, "method": method, "candidates": candidates, "version": {"emotion_model": EMOTION_MODEL, "zero_shot": "facebook/bart-large-mnli"}}
+    result = {"emotion": color_data["label"], "hue": color_data["hue"], "confidence": f"{chosen_score:.1%}", "raw_emotion": raw, "method": method, "candidates": candidates, "version": {"emotion_model": EMOTION_MODEL, "zero_shot": "facebook/bart-large-mnli"}}
+    result["summary"] = make_summary(text)
+    return result
 
 
 def analyze_lines(lines: List[str]) -> dict:

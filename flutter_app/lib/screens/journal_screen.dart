@@ -138,9 +138,15 @@ class _JournalScreenState extends State<JournalScreen> {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.home, color: Colors.white, size: 28),
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: () {
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(builder: (context) => const HomeScreen()),
+                            (route) => false,
+                          );
+                        },
                       ),
-                      Icon(Icons.menu_book, color: Colors.white, size: 40),
+                      Image.asset('assets/images/lumi_logo.png', height: 40),
                       const SizedBox(width: 12),
                       const Text(
                         'LUMI',

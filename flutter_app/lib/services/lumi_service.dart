@@ -7,7 +7,7 @@ class LumiService {
   // For Android emulator: use 'http://10.0.2.2:8000'
   // For physical device on LAN: use 'http://YOUR_LOCAL_IP:8000' (e.g., 'http://192.168.1.100:8000')
   // For production: use your server URL with HTTPS
-  final String baseUrl = 'http://192.168.0.85:8000';
+  final String baseUrl = 'http://10.0.2.2:8000';
 
   /// Predict emotion from a single text string
   Future<Map<String, dynamic>> predictText(String text) async {

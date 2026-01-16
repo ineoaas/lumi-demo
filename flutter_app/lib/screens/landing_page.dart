@@ -26,7 +26,7 @@ class LandingPage extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.menu_book, color: Colors.white, size: 28),
+                        Image.asset('assets/images/lumi_logo.png', height: 32),
                         const SizedBox(width: 8),
                         const Text(
                           'LUMI',
@@ -93,7 +93,7 @@ class LandingPage extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 40),
-                        // Book illustration
+                        // Logo illustration
                         Container(
                           width: 200,
                           height: 150,
@@ -101,10 +101,11 @@ class LandingPage extends StatelessWidget {
                             color: Colors.white.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: const Icon(
-                            Icons.menu_book,
-                            size: 80,
-                            color: Colors.white54,
+                          child: Center(
+                            child: Image.asset(
+                              'assets/images/lumi_logo.png',
+                              height: 80,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 60),

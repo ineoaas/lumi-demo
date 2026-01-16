@@ -3,6 +3,7 @@ import '../services/auth_service.dart';
 import 'home_screen.dart';
 import 'terms_screen.dart';
 import 'privacy_policy_screen.dart';
+import 'landing_page.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({Key? key}) : super(key: key);
@@ -121,6 +122,22 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
+                      onPressed: () {
+                        if (Navigator.canPop(context)) {
+                          Navigator.pop(context);
+                        } else {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(builder: (context) => const LandingPage()),
+                          );
+                        }
+                      },
+                      padding: EdgeInsets.zero,
+                      alignment: Alignment.centerLeft,
+                    ),
+                    const SizedBox(height: 10),
                     const Text(
                       'Sign up',
                       style: TextStyle(

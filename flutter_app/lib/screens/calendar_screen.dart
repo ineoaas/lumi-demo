@@ -153,7 +153,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           );
                         },
                       ),
-                      Icon(Icons.menu_book, color: Colors.white, size: 40),
+                      Image.asset('assets/images/lumi_logo.png', height: 40),
                       const SizedBox(width: 12),
                       const Text(
                         'LUMI',
